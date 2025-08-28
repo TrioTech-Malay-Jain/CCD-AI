@@ -1,3 +1,6 @@
+# ARCHIVED: Legacy single-org vector DB builder. Not used in multi-org system.
+# This script was originally designed for a single organization setup.
+# It is now deprecated and should be archived.
 # build_db.py - One-time script to build the vector store
 
 import os

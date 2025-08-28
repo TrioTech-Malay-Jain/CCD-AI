@@ -12,7 +12,7 @@ import os
 
 from config import API_PREFIX, HOST, PORT, DEBUG, STATIC_DIR, TEMPLATES_DIR
 from models.schemas import HealthCheck
-from api import files_router, query_router, company_router
+from api import files_router, query_router  # Removed company_router import
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -77,7 +77,7 @@ if TEMPLATES_DIR.exists():
 # Include API routers
 app.include_router(files_router, prefix=API_PREFIX)
 app.include_router(query_router, prefix=API_PREFIX)
-app.include_router(company_router, prefix=API_PREFIX)
+# app.include_router(company_router, prefix=API_PREFIX)  # Commented out to disable company endpoints
 
 
 @app.get("/", response_class=HTMLResponse)
