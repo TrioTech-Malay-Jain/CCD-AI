@@ -1,7 +1,7 @@
 import os
 
 # Root directory to start searching from
-ROOT_DIR = r"D:\ML Folders\ml_env\GitHub\CCD-AI"
+ROOT_DIR = r"D:\ML Folders\ml_env\GitHub\ttRag"
 # File extensions to include
 INCLUDE_EXTENSIONS = {'.py', '.js', '.css', '.html', '.txt','.json'}
 

@@ -2,6 +2,40 @@
 credentials.json
 chroma_db/chroma.sqlite3
 chroma.sqlite3
-*.txt
+knowledge_base/*.txt
+knowledge_base/*.json
+knowledge_base/*.pdf
+knowledge_base/*.docx
 env.json
 venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# VS Code
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# ChromaDB vector files
+chroma_db/*/*.bin
+chroma_db/*/*.sqlite3
+
+# Logs
+*.log
+
+# Flask legacy
+flask_structure/
+
+# Archive legacy scripts
+main.py
+build_db.py
+run_fastapi.py
+
+# Misc
+*.bak
+/knowledge_base
+/chroma_db

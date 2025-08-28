@@ -16,7 +16,7 @@ Make sure you have:
   ```
 - Valid `.env` file in your local project root with updated Google API keys
 - Access to your Azure Container Registry (ACR): `ccdchatbotacr`
-- Your Azure App Service is configured: `ccd-ai-chatbot`
+- Your Azure App Service is configured: `ttrag-system`
 
 ---
 
@@ -58,7 +58,7 @@ docker push ccdchatbotacr.azurecr.io/chatbot:latest
 ```powershell
 az webapp config container set `
   --resource-group ccd-chatbot-rg `
-  --name ccd-ai-chatbot `
+  --name ttrag-system `
   --container-image-name ccdchatbotacr.azurecr.io/chatbot:latest `
   --container-registry-url https://ccdchatbotacr.azurecr.io `
   --container-registry-user ccdchatbotacr `
@@ -76,7 +76,7 @@ az acr credential show --name ccdchatbotacr
 ## 🔄 Step 4: Restart Web App
 
 ```bash
-az webapp restart --resource-group ccd-chatbot-rg --name ccd-ai-chatbot
+az webapp restart --resource-group ttrag-rg --name ttrag-system
 ```
 
 ---
@@ -84,7 +84,7 @@ az webapp restart --resource-group ccd-chatbot-rg --name ccd-ai-chatbot
 ## 🔎 Step 5: Confirm with Live Logs
 
 ```bash
-az webapp log tail --name ccd-ai-chatbot --resource-group ccd-chatbot-rg
+az webapp log tail --name ttrag-system --resource-group ttrag-rg
 ```
 
 Watch for:

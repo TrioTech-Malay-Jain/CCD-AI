@@ -1,26 +1,53 @@
-# Use an official Python runtime as a parent image
+# Use Python 3.11 slim image for better compatibility
 FROM python:3.11-slim
 
-# Set the working directory in the container
+# Set working directory
 WORKDIR /app
 
-# Copy the requirements file into the container
+# Install system dependencies for PDF and document processing
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install any needed packages specified in requirements.txt
+# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of your application's code into the container
+# Copy application code
 COPY . .
 
-# Run the build script to create the chroma_db
+# Create necessary directories
+RUN mkdir -p knowledge_base chroma_db static templates
+
+# Build the vector database if knowledge base files exist
 # This will use the GOOGLE_API_KEY_1 provided during the build process
 ARG GOOGLE_API_KEY_1
+ARG GOOGLE_API_KEY_2
+ARG GOOGLE_API_KEY_3
+ARG GOOGLE_API_KEY_4
+ARG GOOGLE_API_KEY_5
+ARG SECRET_KEY
+
 ENV GOOGLE_API_KEY_1=$GOOGLE_API_KEY_1
-RUN python build_db.py
+ENV GOOGLE_API_KEY_2=$GOOGLE_API_KEY_2
+ENV GOOGLE_API_KEY_3=$GOOGLE_API_KEY_3
+ENV GOOGLE_API_KEY_4=$GOOGLE_API_KEY_4
+ENV GOOGLE_API_KEY_5=$GOOGLE_API_KEY_5
+ENV SECRET_KEY=$SECRET_KEY
 
-# Expose the port Gunicorn will run on
-EXPOSE 8080
+# Only build DB if knowledge base files exist
+RUN if [ -n "$(ls -A knowledge_base/ 2>/dev/null)" ]; then python build_db.py; fi
 
-# Define the command to run your app using Gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--timeout", "120", "run:app"]
+# Expose port 8000 for FastAPI
+EXPOSE 8000
+
+# Health check for FastAPI
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/api/health || exit 1
+
+# Run FastAPI with uvicorn
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
