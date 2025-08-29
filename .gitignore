@@ -39,3 +39,6 @@ run_fastapi.py
 *.bak
 # /knowledge_base
 /chroma_db
+
+# Private documentation
+understanding.md
