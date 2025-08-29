@@ -10,6 +10,7 @@ from fastapi.responses import HTMLResponse
 from datetime import datetime
 import os
 
+from config import KNOWLEDGE_BASE_DIR
 from config import API_PREFIX, HOST, PORT, DEBUG, STATIC_DIR, TEMPLATES_DIR
 from models.schemas import HealthCheck
 from api import files_router, query_router  # Removed company_router import
@@ -70,6 +71,10 @@ app.add_middleware(
 # Mount static files and templates (if they exist)
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+# Mount knowledge_base as static files for file viewing
+if KNOWLEDGE_BASE_DIR.exists():
+    app.mount("/files", StaticFiles(directory=str(KNOWLEDGE_BASE_DIR)), name="files")
 
 if TEMPLATES_DIR.exists():
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))

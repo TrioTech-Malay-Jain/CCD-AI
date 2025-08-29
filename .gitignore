@@ -2,10 +2,10 @@
 credentials.json
 chroma_db/chroma.sqlite3
 chroma.sqlite3
-knowledge_base/*.txt
-knowledge_base/*.json
-knowledge_base/*.pdf
-knowledge_base/*.docx
+# knowledge_base/*.txt
+# knowledge_base/*.json
+# knowledge_base/*.pdf
+# knowledge_base/*.docx
 env.json
 venv/
 __pycache__/
@@ -37,5 +37,5 @@ run_fastapi.py
 
 # Misc
 *.bak
-/knowledge_base
+# /knowledge_base
 /chroma_db

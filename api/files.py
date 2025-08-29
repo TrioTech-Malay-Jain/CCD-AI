@@ -1,13 +1,16 @@
 """
 File upload and management API endpoints
 """
-from typing import List
+from typing import List, Dict, Any
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
+import os
+from pathlib import Path
 
 from models.schemas import FileInfo, FileUploadRequest, BuildStatus
 from services.file_service import file_service
 from services.embedding_service import embedding_service
+from config import KNOWLEDGE_BASE_DIR
 
 router = APIRouter(prefix="/files", tags=["files"])
 
@@ -124,3 +127,113 @@ async def get_build_status(company_id: str):
     """Get build status for a company's vector database"""
     
     return embedding_service.get_build_status(company_id)
+
+
+@router.get("/file-paths/{company_id}")
+async def get_company_file_paths(company_id: str):
+    """Get static file paths for all files in a company for frontend viewing"""
+    
+    try:
+        company_dir = KNOWLEDGE_BASE_DIR / company_id
+        
+        if not company_dir.exists():
+            raise HTTPException(status_code=404, detail=f"Company {company_id} not found")
+        
+        file_paths = []
+        
+        # Get all files in the company directory
+        for file_path in company_dir.iterdir():
+            if file_path.is_file() and file_path.name != "metadata.json":
+                # Create static URL for the file
+                static_url = f"/files/{company_id}/{file_path.name}"
+                
+                file_info = {
+                    "filename": file_path.name,
+                    "static_url": static_url,
+                    "file_size": file_path.stat().st_size,
+                    "file_extension": file_path.suffix.lower()
+                }
+                file_paths.append(file_info)
+        
+        return {
+            "company_id": company_id,
+            "total_files": len(file_paths),
+            "files": file_paths
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get file paths: {str(e)}")
+
+
+@router.get("/file-url/{company_id}/{filename}")
+async def get_file_url(company_id: str, filename: str):
+    """Get static URL for a specific file"""
+    
+    try:
+        file_path = KNOWLEDGE_BASE_DIR / company_id / filename
+        
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail=f"File {filename} not found in company {company_id}")
+        
+        static_url = f"/files/{company_id}/{filename}"
+        
+        return {
+            "company_id": company_id,
+            "filename": filename,
+            "static_url": static_url,
+            "file_size": file_path.stat().st_size,
+            "file_extension": file_path.suffix.lower()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get file URL: {str(e)}")
+
+
+@router.get("/all-file-paths")
+async def get_all_file_paths():
+    """Get static file paths for all files across all companies"""
+    
+    try:
+        all_files = {}
+        
+        if not KNOWLEDGE_BASE_DIR.exists():
+            return {"companies": {}, "total_companies": 0, "total_files": 0}
+        
+        total_files = 0
+        
+        # Iterate through all company directories
+        for company_dir in KNOWLEDGE_BASE_DIR.iterdir():
+            if company_dir.is_dir():
+                company_id = company_dir.name
+                file_paths = []
+                
+                for file_path in company_dir.iterdir():
+                    if file_path.is_file() and file_path.name != "metadata.json":
+                        static_url = f"/files/{company_id}/{file_path.name}"
+                        
+                        file_info = {
+                            "filename": file_path.name,
+                            "static_url": static_url,
+                            "file_size": file_path.stat().st_size,
+                            "file_extension": file_path.suffix.lower()
+                        }
+                        file_paths.append(file_info)
+                        total_files += 1
+                
+                all_files[company_id] = {
+                    "file_count": len(file_paths),
+                    "files": file_paths
+                }
+        
+        return {
+            "companies": all_files,
+            "total_companies": len(all_files),
+            "total_files": total_files
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get all file paths: {str(e)}")
