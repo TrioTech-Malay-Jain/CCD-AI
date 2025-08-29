@@ -80,6 +80,12 @@ app.include_router(query_router, prefix=API_PREFIX)
 # app.include_router(company_router, prefix=API_PREFIX)  # Commented out to disable company endpoints
 
 
+@app.get("/health")
+async def simple_health_check():
+    """Simple health check endpoint"""
+    return {"status": "healthy"}
+
+
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     """Serve the main interface"""

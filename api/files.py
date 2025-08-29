@@ -5,7 +5,7 @@ from typing import List
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
 
-from models.schemas import FileInfo, FileUploadRequest
+from models.schemas import FileInfo, FileUploadRequest, BuildStatus
 from services.file_service import file_service
 from services.embedding_service import embedding_service
 
@@ -18,13 +18,27 @@ async def upload_file(
     company_id: str = Form(..., description="Company ID for file isolation"),
     file: UploadFile = File(..., description="File to upload")
 ):
-    """Upload a file for a specific company"""
+    """Upload a file for a specific company and automatically build vector database"""
     
     try:
         # Save file
         file_info = await file_service.save_uploaded_file(company_id, file)
         
-        # Add background task to process document
+        # Check if company directory exists
+        company_dir = file_service.get_company_directory(company_id)
+        if not company_dir.exists():
+            raise HTTPException(status_code=404, detail=f"Company {company_id} not found")
+        
+        # Check if already building
+        current_status = embedding_service.get_build_status(company_id)
+        if current_status.status != "building":
+            # Start build process in background for the entire company
+            background_tasks.add_task(
+                embedding_service.process_company_documents, 
+                company_id
+            )
+        
+        # Also add the individual document processing as fallback
         background_tasks.add_task(
             embedding_service.add_document_to_company, 
             company_id, 
@@ -96,3 +110,10 @@ async def get_file_stats(company_id: str):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get file stats: {str(e)}")
+
+
+@router.get("/build-status/{company_id}", response_model=BuildStatus)
+async def get_build_status(company_id: str):
+    """Get build status for a company's vector database"""
+    
+    return embedding_service.get_build_status(company_id)

@@ -6,7 +6,9 @@ A production-ready Retrieval Augmented Generation (RAG) system supporting multip
 
 ## Features
 - **Multi-organization isolation**: Each company has its own files and vector DB collection
+- **Automatic vector database building**: Vector DB is automatically built when files are uploaded
 - **File upload, listing, deletion**: Per-company file management
+- **Build status monitoring**: Check the status of vector database building process
 - **Vector search and chat**: Query and chat endpoints scoped to company
 - **Scalable and modular**: Easily add new companies and files
 - **Modern stack**: FastAPI, LangChain, ChromaDB, Google Gemini
@@ -96,7 +98,8 @@ Visit [http://localhost:8000/docs](http://localhost:8000/docs) for API documenta
 
 > **Note:** Company management endpoints are currently commented out and not exposed. Only file and query endpoints are active.
 
-- `POST /api/v1/files/upload` — Upload file (requires `company_id`)
+- `POST /api/v1/files/upload` — Upload file (requires `company_id`) and automatically builds vector DB
+- `GET /api/v1/files/build-status/{company_id}` — Check vector DB build status
 - `GET /api/v1/files/list?company_id=...` — List files for a company
 - `GET /api/v1/files/{file_id}?company_id=...` — Get file info
 - `DELETE /api/v1/files/{file_id}?company_id=...` — Delete file
@@ -107,7 +110,7 @@ Visit [http://localhost:8000/docs](http://localhost:8000/docs) for API documenta
 
 ## Example Usage
 
-### Upload a file
+### Upload a file (automatically builds vector DB)
 ```python
 import requests
 with open('mydoc.pdf', 'rb') as f:
@@ -115,6 +118,14 @@ with open('mydoc.pdf', 'rb') as f:
                      files={'file': f},
                      data={'company_id': 'company1'})
     print(r.json())
+    # The vector database will be automatically built in the background
+```
+
+### Check build status
+```python
+import requests
+r = requests.get('http://localhost:8000/api/v1/files/build-status/company1')
+print(r.json())  # {'status': 'completed', 'message': 'Vector database ready'}
 ```
 
 ### Query documents

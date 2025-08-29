@@ -44,9 +44,23 @@ class ChromaManager:
         self.current_key_index = (self.current_key_index + 1) % len(self.api_keys)
         self._embeddings = None  # Reset to use new key
     
+    def sanitize_company_name(self, company_id: str) -> str:
+        """Sanitize company name to be valid for ChromaDB collection name"""
+        # Replace spaces with underscores and remove invalid characters
+        sanitized = company_id.replace(" ", "_").replace("-", "_")
+        # Keep only alphanumeric, dots, and underscores
+        sanitized = "".join(c for c in sanitized if c.isalnum() or c in "._")
+        # Ensure it starts and ends with alphanumeric
+        sanitized = sanitized.strip("._")
+        # Ensure minimum length
+        if len(sanitized) < 3:
+            sanitized = f"company_{sanitized}"
+        return sanitized
+    
     def get_collection_name(self, company_id: str) -> str:
         """Generate collection name for company"""
-        return f"{COLLECTION_PREFIX}{company_id}"
+        sanitized_id = self.sanitize_company_name(company_id)
+        return f"{COLLECTION_PREFIX}{sanitized_id}"
     
     def get_company_vectorstore(self, company_id: str) -> Chroma:
         """Get or create vector store for a specific company"""
