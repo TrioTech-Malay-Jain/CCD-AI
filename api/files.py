@@ -38,6 +38,13 @@ async def upload_file(
                 company_id
             )
         
+        # Also create file-specific collection for targeted querying
+        background_tasks.add_task(
+            embedding_service.create_file_specific_collection,
+            company_id,
+            file_info.file_id
+        )
+        
         # Also add the individual document processing as fallback
         background_tasks.add_task(
             embedding_service.add_document_to_company, 

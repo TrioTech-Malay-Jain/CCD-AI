@@ -145,6 +145,30 @@ class FileOperationsService:
         metadata = self.load_file_metadata(company_id)
         return metadata.get(file_id)
     
+    def get_file_path(self, company_id: str, filename: str) -> Path:
+        """Get the full path to a file"""
+        company_dir = self.get_company_directory(company_id)
+        return company_dir / filename
+    
+    def find_company_by_file_id(self, file_id: str) -> Optional[str]:
+        """Find which company a file belongs to by searching all companies"""
+        try:
+            # List all company directories
+            for company_dir in self.base_dir.iterdir():
+                if company_dir.is_dir():
+                    company_id = company_dir.name
+                    
+                    # Check if this company has the file
+                    file_info = self.get_file_info(company_id, file_id)
+                    if file_info:
+                        return company_id
+            
+            return None
+            
+        except Exception as e:
+            print(f"Error finding company for file {file_id}: {e}")
+            return None
+    
     def delete_file(self, company_id: str, file_id: str) -> bool:
         """Delete a file and its metadata"""
         try:
@@ -211,6 +235,31 @@ class FileOperationsService:
                 continue
         
         return documents
+    
+    def load_document(self, file_path: Path) -> List[Document]:
+        """Load a single document as LangChain Documents"""
+        if not file_path.exists():
+            raise ValueError(f"File does not exist: {file_path}")
+        
+        # Determine file extension
+        extension = file_path.suffix.lower()
+        
+        try:
+            # Load document based on file type
+            docs = self._load_document_by_type(file_path, extension)
+            
+            # Add basic metadata
+            for doc in docs:
+                doc.metadata.update({
+                    'source': str(file_path),
+                    'file_type': extension.replace('.', ''),
+                    'filename': file_path.name
+                })
+            
+            return docs
+            
+        except Exception as e:
+            raise ValueError(f"Error loading document {file_path}: {e}")
     
     def _load_document_by_type(self, file_path: Path, extension: str) -> List[Document]:
         """Load document using appropriate loader based on file type"""

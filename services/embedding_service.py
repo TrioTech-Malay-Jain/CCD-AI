@@ -240,6 +240,176 @@ Context:
             
             raise Exception(f"Query failed: {str(e)}")
     
+    async def query_specific_file(self, company_id: str, file_id: str, query: str, chat_history: List[dict] = None) -> dict:
+        """Query a specific file for a company"""
+        
+        from services.file_service import file_service
+        from db.chroma_manager import chroma_manager
+        
+        # Get the file info
+        file_info = file_service.get_file_info(company_id, file_id)
+        if not file_info:
+            raise ValueError(f"File {file_id} not found for company {company_id}")
+        
+        try:
+            # Check if file-specific collection exists, if not create it
+            file_vectorstore = chroma_manager.get_file_vectorstore(company_id, file_id)
+            
+            # Check if collection has documents
+            try:
+                collection = file_vectorstore._collection
+                doc_count = collection.count()
+                
+                if doc_count == 0:
+                    # Collection is empty, need to populate it
+                    file_path = file_service.get_file_path(company_id, file_info.filename)
+                    documents = file_service.load_document(file_path)
+                    
+                    if documents:
+                        # Create the file collection with documents
+                        success = chroma_manager.create_file_collection(company_id, file_id, documents)
+                        if not success:
+                            raise ValueError("Failed to create file collection")
+                        
+                        # Get the vectorstore again after creation
+                        file_vectorstore = chroma_manager.get_file_vectorstore(company_id, file_id)
+                    else:
+                        raise ValueError(f"Could not load document: {file_path}")
+                        
+            except Exception as e:
+                # If collection doesn't exist, create it
+                file_path = file_service.get_file_path(company_id, file_info.filename)
+                documents = file_service.load_document(file_path)
+                
+                if documents:
+                    success = chroma_manager.create_file_collection(company_id, file_id, documents)
+                    if not success:
+                        raise ValueError("Failed to create file collection")
+                    
+                    file_vectorstore = chroma_manager.get_file_vectorstore(company_id, file_id)
+                else:
+                    raise ValueError(f"Could not load document: {file_path}")
+            
+            # Create a RAG chain for this file
+            rag_chain = self._create_single_file_rag_chain(file_vectorstore)
+            
+            # Convert chat history to LangChain format
+            chat_history_for_chain = []
+            if chat_history:
+                for msg in chat_history:
+                    content = msg.get('message', '')
+                    if msg.get('sender') == 'user':
+                        chat_history_for_chain.append(HumanMessage(content=content))
+                    else:
+                        chat_history_for_chain.append(AIMessage(content=content))
+            
+            # Query the RAG chain
+            response = rag_chain.invoke({
+                "input": query,
+                "chat_history": chat_history_for_chain
+            })
+            
+            # Extract sources
+            sources = [f"{company_id}/{file_info.filename}"]
+            
+            return {
+                "response": response.get("answer", "I couldn't find an answer to that in the specified document."),
+                "sources": sources,
+                "file_id": file_id,
+                "filename": file_info.original_filename or file_info.filename
+            }
+                
+        except Exception as e:
+            # Try rotating API key and retry once
+            self.rotate_api_key()
+            raise Exception(f"File-specific query failed: {str(e)}")
+    
+    async def create_file_specific_collection(self, company_id: str, file_id: str):
+        """Create a file-specific collection for targeted querying"""
+        try:
+            from services.file_service import file_service
+            from db.chroma_manager import chroma_manager
+            
+            # Get file info and load document
+            file_info = file_service.get_file_info(company_id, file_id)
+            if not file_info:
+                print(f"File {file_id} not found for company {company_id}")
+                return
+            
+            file_path = file_service.get_file_path(company_id, file_info.filename)
+            documents = file_service.load_document(file_path)
+            
+            if documents:
+                # Create file-specific collection
+                success = chroma_manager.create_file_collection(company_id, file_id, documents)
+                if success:
+                    print(f"✅ Created file collection for {company_id}/{file_info.filename}")
+                else:
+                    print(f"❌ Failed to create file collection for {company_id}/{file_info.filename}")
+            else:
+                print(f"❌ No documents loaded from {file_path}")
+                
+        except Exception as e:
+            print(f"Error creating file collection for {company_id}/{file_id}: {e}")
+    
+    def _create_single_file_rag_chain(self, vectorstore):
+        """Create a RAG chain for a single file"""
+        from langchain.chains import create_history_aware_retriever, create_retrieval_chain
+        from langchain.chains.combine_documents import create_stuff_documents_chain
+        from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        
+        # Get current API key
+        current_api_key = self.api_keys[self.current_key_index] if self.api_keys else None
+        if not current_api_key:
+            raise ValueError("No Google API key available")
+        
+        # Create LLM
+        llm = ChatGoogleGenerativeAI(
+            model=LLM_MODEL,
+            google_api_key=current_api_key,
+            temperature=0.3
+        )
+        
+        # Create retriever
+        retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
+        
+        # History-aware retriever prompt
+        contextualize_q_system_prompt = """Given a chat history and the latest user question \
+which might reference context in the chat history, formulate a standalone question \
+which can be understood without the chat history. Do NOT answer the question, \
+just reformulate it if needed and otherwise return it as is."""
+        
+        contextualize_q_prompt = ChatPromptTemplate.from_messages([
+            ("system", contextualize_q_system_prompt),
+            MessagesPlaceholder("chat_history"),
+            ("human", "{input}"),
+        ])
+        
+        history_aware_retriever = create_history_aware_retriever(
+            llm, retriever, contextualize_q_prompt
+        )
+        
+        # QA prompt
+        qa_system_prompt = """You are an assistant for question-answering tasks. \
+Use the following pieces of retrieved context to answer the question. \
+If you don't know the answer, just say that you don't know. \
+Keep the answer concise but comprehensive.
+
+{context}"""
+        
+        qa_prompt = ChatPromptTemplate.from_messages([
+            ("system", qa_system_prompt),
+            MessagesPlaceholder("chat_history"),
+            ("human", "{input}"),
+        ])
+        
+        question_answer_chain = create_stuff_documents_chain(llm, qa_prompt)
+        
+        rag_chain = create_retrieval_chain(history_aware_retriever, question_answer_chain)
+        
+        return rag_chain
+    
     def get_build_status(self, company_id: str) -> BuildStatus:
         """Get build status for a company"""
         return self.build_statuses.get(company_id, BuildStatus(

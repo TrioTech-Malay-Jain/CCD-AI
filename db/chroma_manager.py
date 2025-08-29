@@ -62,9 +62,27 @@ class ChromaManager:
         sanitized_id = self.sanitize_company_name(company_id)
         return f"{COLLECTION_PREFIX}{sanitized_id}"
     
+    def get_file_collection_name(self, company_id: str, file_id: str) -> str:
+        """Generate collection name for a specific file within a company"""
+        sanitized_company = self.sanitize_company_name(company_id)
+        # Use first 8 characters of file_id for collection name
+        file_short_id = file_id.replace("-", "")[:8]
+        return f"{COLLECTION_PREFIX}{sanitized_company}_file_{file_short_id}"
+    
     def get_company_vectorstore(self, company_id: str) -> Chroma:
         """Get or create vector store for a specific company"""
         collection_name = self.get_collection_name(company_id)
+        embeddings = self.get_embeddings()
+        
+        return Chroma(
+            collection_name=collection_name,
+            persist_directory=str(self.db_path),
+            embedding_function=embeddings
+        )
+    
+    def get_file_vectorstore(self, company_id: str, file_id: str) -> Chroma:
+        """Get or create vector store for a specific file within a company"""
+        collection_name = self.get_file_collection_name(company_id, file_id)
         embeddings = self.get_embeddings()
         
         return Chroma(
@@ -91,6 +109,28 @@ class ChromaManager:
             
         except Exception as e:
             print(f"Error creating collection for company {company_id}: {e}")
+            # Try rotating API key
+            self.rotate_api_key()
+            return False
+    
+    def create_file_collection(self, company_id: str, file_id: str, documents: List[Document]) -> bool:
+        """Create a new collection for a specific file with documents"""
+        try:
+            collection_name = self.get_file_collection_name(company_id, file_id)
+            embeddings = self.get_embeddings()
+            
+            # Create vector store with documents
+            vectorstore = Chroma.from_documents(
+                documents,
+                embeddings,
+                collection_name=collection_name,
+                persist_directory=str(self.db_path)
+            )
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error creating file collection for {company_id}/{file_id}: {e}")
             # Try rotating API key
             self.rotate_api_key()
             return False

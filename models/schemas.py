@@ -35,6 +35,14 @@ class FileInfo(BaseModel):
 class QueryRequest(BaseModel):
     query: str = Field(..., description="The question to ask")
     company_id: str = Field(..., description="Company ID for data isolation")
+    file_id: Optional[str] = Field(None, description="Optional file ID to query specific document")
+    session_id: Optional[str] = None
+    history: Optional[List[Dict[str, str]]] = []
+    max_results: Optional[int] = 5
+
+class FileChatRequest(BaseModel):
+    query: str = Field(..., description="The question to ask")
+    file_id: str = Field(..., description="File ID to chat with")
     session_id: Optional[str] = None
     history: Optional[List[Dict[str, str]]] = []
     max_results: Optional[int] = 5
@@ -45,6 +53,7 @@ class QueryResponse(BaseModel):
     session_id: str
     timestamp: datetime
     sources: Optional[List[str]] = []
+    file_info: Optional[Dict[str, str]] = None  # For file-specific queries
 
 class BuildStatus(BaseModel):
     status: str  # "idle", "building", "completed", "error"
